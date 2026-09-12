@@ -171,7 +171,7 @@ public class AddonController : ControllerBase
                 }
 
                 LogBuffer.AddLog($"[Stream] Processing DTO: {dto.Name} (Id: {dto.Id}, MediaSources: {mediaSourceCount})", LogLevel.Info);
-                if (dto.MediaSources == null || dto.MediaSources.Count == 0)
+                if (dto.MediaSources == null)
                 {
                     return Enumerable.Empty<StreamDto>();
                 }
