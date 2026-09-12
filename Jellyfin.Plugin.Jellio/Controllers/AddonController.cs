@@ -167,7 +167,7 @@ public class AddonController : ControllerBase
                 int mediaSourceCount = 0;
                 if (dto.MediaSources != null)
                 {
-                    mediaSourceCount = dto.MediaSources.Count();
+                    mediaSourceCount = dto.MediaSources.Count;
                 }
 
                 LogBuffer.AddLog($"[Stream] Processing DTO: {dto.Name} (Id: {dto.Id}, MediaSources: {mediaSourceCount})", LogLevel.Info);
@@ -182,7 +182,7 @@ public class AddonController : ControllerBase
                      * Jellyfin's HLS endpoint requires the caller to declare which codecs the player supports.
                      * It compares these against the media file's codecs to decide whether to pass through without re-encoding or transcode.
                      *
-                     * Stremio's addon protocol has no mechanism for the client to advertise its codec capabilities to addons, so we hardcode them here. The lists below reflect what Stremio's players[...]
+                     * Stremio's addon protocol has no mechanism for the client to advertise its codec capabilities to addons, so we hardcode them here. The lists below reflect what Stremio's players support.
                      * See: https://github.com/jellyfin/jellyfin-web/blob/285196329/src/scripts/browserDeviceProfile.js#L914-L925
                      *
                      * Without these params Jellyfin would fall back to "m3u8" as the audio codec name, producing invalid FFmpeg commands.
