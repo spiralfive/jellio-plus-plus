@@ -155,65 +155,75 @@ public class AddonController : ControllerBase
         LogBuffer.AddLog($"[Stream] Processing {items.Count} item(s) for user {user.Username}", LogLevel.Info);
         var baseUrl = GetBaseUrl(publicBaseUrl);
         LogBuffer.AddLog($"[Stream] Base URL: {baseUrl}", LogLevel.Info);
-        var dtoOptions = new DtoOptions(true);
-        var dtos = _dtoService.GetBaseItemDtos(items, dtoOptions, user);
-        LogBuffer.AddLog($"[Stream] Got {dtos.Count} DTO(s)", LogLevel.Info);
-
-        var streams = dtos.SelectMany(dto =>
+        
+        try
         {
-            int mediaSourceCount = 0;
-            if (dto.MediaSources != null)
-            {
-                mediaSourceCount = dto.MediaSources.Count();
-            }
+            var dtoOptions = new DtoOptions(true);
+            var dtos = _dtoService.GetBaseItemDtos(items, dtoOptions, user);
+            LogBuffer.AddLog($"[Stream] Got {dtos.Count} DTO(s)", LogLevel.Info);
 
-            LogBuffer.AddLog($"[Stream] Processing DTO: {dto.Name} (Id: {dto.Id}, MediaSources: {mediaSourceCount})", LogLevel.Info);
-            if (dto.MediaSources == null)
+            var streams = dtos.SelectMany(dto =>
             {
-                return Enumerable.Empty<StreamDto>();
-            }
+                int mediaSourceCount = 0;
+                if (dto.MediaSources != null)
+                {
+                    mediaSourceCount = dto.MediaSources.Count();
+                }
 
-            return dto.MediaSources.Select(source =>
-            {
-                /*
-                 * Jellyfin's HLS endpoint requires the caller to declare which codecs the player supports.
-                 * It compares these against the media file's codecs to decide whether to pass through without re-encoding or transcode.
-                 *
-                 * Stremio's addon protocol has no mechanism for the client to advertise its codec capabilities to addons, so we hardcode them here. The lists below reflect what Stremio's players can decode. This is the same pattern every Jellyfin client follows - e.g. jellyfin-web builds its codec list.
-                 * See: https://github.com/jellyfin/jellyfin-web/blob/285196329/src/scripts/browserDeviceProfile.js#L914-L925
-                 *
-                 * Without these params Jellyfin would fall back to "m3u8" as the audio codec name, producing invalid FFmpeg commands.
-                 * See: https://github.com/jellyfin/jellyfin/issues/12926
-                 */
-                string[] videoCodecs = ["h264", "hevc", "av1"];
-                string[] audioCodecs = ["aac", "mp3", "ac3", "eac3", "flac", "opus"];
-                var query = QueryString.Create(new Dictionary<string, string?>
+                LogBuffer.AddLog($"[Stream] Processing DTO: {dto.Name} (Id: {dto.Id}, MediaSources: {mediaSourceCount})", LogLevel.Info);
+                if (dto.MediaSources == null || dto.MediaSources.Count == 0)
                 {
-                    ["mediaSourceId"] = source.Id,
-                    ["api_key"] = authToken,
-                    ["videoCodec"] = string.Join(',', videoCodecs),
-                    ["audioCodec"] = string.Join(',', audioCodecs),
-                });
-                var streamUrl = $"{baseUrl}/Videos/{dto.Id}/master.m3u8{query}";
-                LogBuffer.AddLog($"[Stream] Generated stream for {dto.Name} ({dto.Id}): {source.Name} - URL: {streamUrl}", LogLevel.Info);
-                return new StreamDto
+                    return Enumerable.Empty<StreamDto>();
+                }
+
+                return dto.MediaSources.Select(source =>
                 {
-                    Url = streamUrl,
-                    Name = "Jellio++",
-                    Description = source.Name,
-                    BehaviorHints = new BehaviorHintsDto
+                    /*
+                     * Jellyfin's HLS endpoint requires the caller to declare which codecs the player supports.
+                     * It compares these against the media file's codecs to decide whether to pass through without re-encoding or transcode.
+                     *
+                     * Stremio's addon protocol has no mechanism for the client to advertise its codec capabilities to addons, so we hardcode them here. The lists below reflect what Stremio's players[...]
+                     * See: https://github.com/jellyfin/jellyfin-web/blob/285196329/src/scripts/browserDeviceProfile.js#L914-L925
+                     *
+                     * Without these params Jellyfin would fall back to "m3u8" as the audio codec name, producing invalid FFmpeg commands.
+                     * See: https://github.com/jellyfin/jellyfin/issues/12926
+                     */
+                    string[] videoCodecs = ["h264", "hevc", "av1"];
+                    string[] audioCodecs = ["aac", "mp3", "ac3", "eac3", "flac", "opus"];
+                    var query = QueryString.Create(new Dictionary<string, string?>
                     {
-                        Filename = string.IsNullOrEmpty(source.Path) ? null : Path.GetFileName(source.Path),
-                        VideoSize = source.Size,
-                        VideoHash = OpenSubtitlesHash.ComputeFromPath(source.Path),
-                        NotWebReady = true,
-                    },
-                };
-            });
-        }).ToList();
+                        ["mediaSourceId"] = source.Id,
+                        ["api_key"] = authToken,
+                        ["videoCodec"] = string.Join(',', videoCodecs),
+                        ["audioCodec"] = string.Join(',', audioCodecs),
+                    });
+                    var streamUrl = $"{baseUrl}/Videos/{dto.Id}/master.m3u8{query}";
+                    LogBuffer.AddLog($"[Stream] Generated stream for {dto.Name} ({dto.Id}): {source.Name} - URL: {streamUrl}", LogLevel.Info);
+                    return new StreamDto
+                    {
+                        Url = streamUrl,
+                        Name = "Jellio++",
+                        Description = source.Name,
+                        BehaviorHints = new BehaviorHintsDto
+                        {
+                            Filename = string.IsNullOrEmpty(source.Path) ? null : Path.GetFileName(source.Path),
+                            VideoSize = source.Size,
+                            VideoHash = OpenSubtitlesHash.ComputeFromPath(source.Path),
+                            NotWebReady = true,
+                        },
+                    };
+                });
+            }).ToList();
 
-        LogBuffer.AddLog($"[Stream] Returning {streams.Count} stream(s)", LogLevel.Info);
-        return Ok(new { streams });
+            LogBuffer.AddLog($"[Stream] Returning {streams.Count} stream(s)", LogLevel.Info);
+            return Ok(new { streams });
+        }
+        catch (Exception ex)
+        {
+            LogBuffer.AddLog($"[Stream] Error processing streams: {ex.Message}", LogLevel.Error);
+            LogBuffer.AddLog($"[Stream] Stack trace: {ex.StackTrace}", LogLevel.Debug);
+            return Ok(new { streams = Array.Empty<object>() });
+        }
     }
 
     [HttpGet("manifest.json")]
