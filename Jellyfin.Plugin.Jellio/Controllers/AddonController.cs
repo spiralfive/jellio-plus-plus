@@ -221,7 +221,7 @@ public class AddonController : ControllerBase
         catch (Exception ex)
         {
             LogBuffer.AddLog($"[Stream] Error processing streams: {ex.Message}", LogLevel.Error);
-            LogBuffer.AddLog($"[Stream] Stack trace: {ex.StackTrace}", LogLevel.Debug);
+            LogBuffer.AddLog($"[Stream] Stack trace: {ex.StackTrace}", LogLevel.Info);
             return Ok(new { streams = Array.Empty<object>() });
         }
     }
